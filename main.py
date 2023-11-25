@@ -18,19 +18,15 @@ bot = telebot.TeleBot(config.main_bot)
 def settings(arg):
     markup = InlineKeyboardMarkup()
     arg -= 1
-    if arg < 0:
-        arg = 0
+    arg = max(arg, 0)
     for x in range(arg * 7, arg * 7 + 7):
-        if sql_exec.get_pos_line("chats", x) != 0:
-            line = sql_exec.get_pos_line_result("chats", x)
-            name = bot.get_chat(line[0][0]).title
-            markup.row(InlineKeyboardButton(f"{x + 1}. {name}", callback_data=f"{bot.get_chat(line[0][0]).id}"))
-        else:
+        if sql_exec.get_pos_line("chats", x) == 0:
             break
+        line = sql_exec.get_pos_line_result("chats", x)
+        name = bot.get_chat(line[0][0]).title
+        markup.row(InlineKeyboardButton(f"{x + 1}. {name}", callback_data=f"{bot.get_chat(line[0][0]).id}"))
     if sql_exec.count_row("chats") > 7:
         markup.row(InlineKeyboardButton("<<", callback_data=f"prev_page_{arg}"), InlineKeyboardButton(">>", callback_data=f"next_page_{arg}"),)
-    else:
-        pass
     return markup
 
 def settings_chat(id_chat):
@@ -39,7 +35,7 @@ def settings_chat(id_chat):
     markup.row(InlineKeyboardButton("🌄 Утренний опрос", callback_data=f"morning_{id_chat}"))
     markup.row(InlineKeyboardButton("🎆 Вечерний опрос", callback_data=f"evening_{id_chat}"))
     markup.row(InlineKeyboardButton("❌ Удалить из чата", callback_data=f"remove_bot_{id_chat}"))
-    markup.row(InlineKeyboardButton("<< Вернуться", callback_data=f"show_settings"))
+    markup.row(InlineKeyboardButton("<< Вернуться", callback_data="show_settings"))
     return markup
 
 def settings_mailing(id_chat):
@@ -57,10 +53,10 @@ def settings_evening(id_chat):
     markup.row(InlineKeyboardButton("⏳ Изменить ответы", callback_data=f"change_answer_evening_{id_chat}"))
     markup.row(InlineKeyboardButton("⏳ Изменить время", callback_data=f"change_time_evening_{id_chat}"))
     y = sql_exec.check("evening_poll", "chat_id", id_chat)[0][3]
-    x = "Включить" if str(y) == "0" or y == None else "Выключить"
+    x = "Включить" if str(y) == "0" or y is None else "Выключить"
     markup.row(InlineKeyboardButton(f"🌄 {x} режим анонимности", callback_data=f"change_bool_anonim_even_{id_chat}"))
     y = sql_exec.check("evening_poll", "chat_id", id_chat)[0][4]
-    x = "Включить" if str(y) == "0" or y == None else "Выключить"
+    x = "Включить" if str(y) == "0" or y is None else "Выключить"
     markup.row(InlineKeyboardButton(f"🎆 {x} режим нескольких ответов", callback_data=f"change_bool_multiply_even_{id_chat}"))
     markup.row(InlineKeyboardButton("❌ Удалить голосование", callback_data=f"remove_evening_{id_chat}"))
     markup.row(InlineKeyboardButton("<< Вернуться", callback_data=f"{id_chat}"))
@@ -72,10 +68,10 @@ def settings_morning(id_chat):
     markup.row(InlineKeyboardButton("⏳ Изменить ответы", callback_data=f"change_answer_morning_{id_chat}"))
     markup.row(InlineKeyboardButton("⏳ Изменить время", callback_data=f"change_time_morning_{id_chat}"))
     y = sql_exec.check("morning_poll", "chat_id", id_chat)[0][3]
-    x = "Включить" if str(y) == "0" or y == None else "Выключить"
+    x = "Включить" if str(y) == "0" or y is None else "Выключить"
     markup.row(InlineKeyboardButton(f"🌄 {x} режим анонимности", callback_data=f"change_bool_anonim_morning_{id_chat}"))
     y = sql_exec.check("morning_poll", "chat_id", id_chat)[0][4]
-    x = "Включить" if str(y) == "0" or y == None else "Выключить"
+    x = "Включить" if str(y) == "0" or y is None else "Выключить"
     markup.row(InlineKeyboardButton(f"🎆 {x} режим нескольких ответов", callback_data=f"change_bool_multiply_morning_{id_chat}"))
     markup.row(InlineKeyboardButton("❌ Удалить голосование", callback_data=f"remove_morning_{id_chat}"))
     markup.row(InlineKeyboardButton("<< Вернуться", callback_data=f"{id_chat}"))
@@ -119,27 +115,44 @@ def settings_message(message):
 def send_welcome(message):
     bot_obj = bot.get_me()
     bot_id = bot_obj.id
-    
+
     for chat_member in message.new_chat_members:
         if chat_member.id == bot_id:
             invited_by = message.from_user.id
             result = sql_exec.check("users", 'user_id', invited_by)
             try:
-                if result[0][1] == None:
-                    bot.send_message(message.chat.id, f'<b>Не инициализированная установка бота!</b>', parse_mode="HTML")
+                if result[0][1] is None:
+                    bot.send_message(
+                        message.chat.id,
+                        '<b>Не инициализированная установка бота!</b>',
+                        parse_mode="HTML",
+                    )
                     bot.leave_chat(message.chat.id)
                 else:
                     sql_exec.set_state(invited_by, "NULL")
-                    if len(sql_exec.check("chats", 'Unique_ID', message.chat.id)) == 0:
-                        sql_exec.insert("chats", "Unique_ID,Mailing_ID,Poll_Morning,Poll_Evening", f"{message.chat.id},NULL,NULL,NULL")
-                    else:
+                    if (
+                        len(
+                            sql_exec.check(
+                                "chats", 'Unique_ID', message.chat.id
+                            )
+                        )
+                        != 0
+                    ):
                         sql_exec.delete_chat(message.chat.id)
-                        sql_exec.insert("chats", "Unique_ID,Mailing_ID,Poll_Morning,Poll_Evening", f"{message.chat.id},NULL,NULL,NULL")
-                    bot.send_message(message.chat.id, f'<b>Установка бота завершена!</b>', parse_mode="HTML")
+                    sql_exec.insert("chats", "Unique_ID,Mailing_ID,Poll_Morning,Poll_Evening", f"{message.chat.id},NULL,NULL,NULL")
+                    bot.send_message(
+                        message.chat.id,
+                        '<b>Установка бота завершена!</b>',
+                        parse_mode="HTML",
+                    )
                     bot.send_message(invited_by, f'<b>"{bot.get_me().full_name}"</b> установился в чат:\n<code>{message.chat.title}</code>', parse_mode="HTML")
             except Exception as e:
                 print(e)
-                bot.send_message(message.chat.id, f'<b>Добавлять бота может пользователь без анонимности!</b>', parse_mode="HTML")
+                bot.send_message(
+                    message.chat.id,
+                    '<b>Добавлять бота может пользователь без анонимности!</b>',
+                    parse_mode="HTML",
+                )
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
