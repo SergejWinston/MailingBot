@@ -13,21 +13,21 @@ def return_table(table: str) -> list:
 
 def check(table: str, columns: str, search_text: str) -> list: 
     conn = sqlite3.connect(NAME_BASE)
-    cursor = conn.cursor() 
+    cursor = conn.cursor()
     sql_query = f"""SELECT * FROM {table} WHERE {columns} = '{search_text}';"""
-    cursor.execute(sql_query) 
-    results = cursor.fetchall() 
-    conn.close() 
-    return [row for row in results]
+    cursor.execute(sql_query)
+    results = cursor.fetchall()
+    conn.close()
+    return list(results)
 
 def check_contains(table: str, columns: str, search_text: str) -> list: 
     conn = sqlite3.connect(NAME_BASE)
-    cursor = conn.cursor() 
+    cursor = conn.cursor()
     sql_query = f"""SELECT *\nFROM {table}\nWHERE ',' || {columns} || ',' LIKE '%{search_text}%';"""
-    cursor.execute(sql_query) 
-    results = cursor.fetchall() 
-    conn.close() 
-    return [row for row in results]
+    cursor.execute(sql_query)
+    results = cursor.fetchall()
+    conn.close()
+    return list(results)
 
 def insert(table: str, columns: str, values: str) -> None:
     conn = sqlite3.connect(NAME_BASE)
